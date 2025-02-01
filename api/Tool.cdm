@@ -1,0 +1,311 @@
+@echo off
+setlocal enabledelayedexpansion
+
+:: Ensure users and webhooks directories exist
+if not exist users mkdir users
+if not exist Webhooks mkdir Webhooks
+
+:main_menu
+cls
+echo ==============================
+echo       LOGIN SYSTEM
+echo ==============================
+echo 1. Sign Up
+echo 2. Login
+echo 3. Exit
+echo ==============================
+choice /c:123 /n /m "Choose an option: "
+
+if errorlevel 3 exit
+if errorlevel 2 goto login
+if errorlevel 1 goto signup
+
+:signup
+cls
+echo ==== SIGN UP ====
+set /p user="Enter a username: "
+
+:: Convert username to lowercase
+for /f "delims=" %%A in ("%user%") do set "user=%%A"
+set "user=%user: =%"
+set "user=%user:~0,1%%user:~1%"
+
+:: Check if username already exists
+if exist users\%user% (
+    echo Username already exists!
+    echo 1. Try Again
+    echo 2. Login Instead
+    choice /c:12 /n /m "Choose an option: "
+    
+    if errorlevel 2 goto login
+    if errorlevel 1 goto signup
+)
+
+:: Create folder for the user
+mkdir users\%user%
+
+:: Call PowerShell to mask password input
+echo Enter a password:
+for /f "delims=" %%P in ('powershell -command "$password = Read-Host -AsSecureString; $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password); [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)"') do set "pass=%%P"
+
+:: Create the password file and name it after the password
+echo %pass% > users\%user%\%pass%.txt
+echo Account created successfully!
+pause
+goto main_menu
+
+:login
+cls
+echo ==== LOGIN ====
+set /p user="Enter your username: "
+
+:: Convert username to lowercase
+for /f "delims=" %%A in ("%user%") do set "user=%%A"
+set "user=%user: =%"
+set "user=%user:~0,1%%user:~1%"
+
+:: Check if the user's folder exists
+if not exist users\%user% (
+    echo Username not found!
+    echo 1. Try Again
+    echo 2. Sign Up
+    echo 3. Return to Main Menu
+    choice /c:123 /n /m "Choose an option: "
+    
+    if errorlevel 3 goto main_menu
+    if errorlevel 2 goto signup
+    if errorlevel 1 goto login
+)
+
+:: Call PowerShell to mask password input
+echo Enter your password:
+for /f "delims=" %%P in ('powershell -command "$password = Read-Host -AsSecureString; $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password); [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)"') do set "pass=%%P"
+
+:: Check if the password file exists with the name of the password
+if exist users\%user%\%pass%.txt (
+    echo Login successful! Welcome, %user%.
+    pause
+    goto second_menu
+) else (
+    echo Incorrect password!
+    pause
+    goto login
+)
+
+:second_menu
+cls
+echo ==============================
+echo       SECOND MAIN MENU
+echo ==============================
+echo 1. Play "31" (Card Game)
+echo 2. Discord Bot (Send Messages)
+echo 3. Logout
+echo ==============================
+choice /c:123Q /n /m "Choose an option (Q to quit): "
+
+if errorlevel 4 goto main_menu
+if errorlevel 3 goto logout
+if errorlevel 2 goto discord_bot
+if errorlevel 1 goto play_31
+
+:play_31
+cls
+echo ==== 31 CARD GAME ====
+echo Goal: Get as close to 31 as possible without going over.
+echo Press Q at any time to return to the menu.
+
+:: Initialize variables
+set /a player_score=0
+set /a dealer_score=0
+set /a round=1
+
+:: Initialize player and dealer hands
+set "player_hand="
+set "dealer_hand="
+
+:: Deal initial cards
+set /a card1=%random% %% 10 + 1
+set /a card2=%random% %% 10 + 1
+set /a player_score=%card1%+%card2%
+set "player_hand=%card1% %card2%"
+
+set /a card1=%random% %% 10 + 1
+set /a card2=%random% %% 10 + 1
+set /a dealer_score=%card1%+%card2%
+set "dealer_hand=%card1% %card2%"
+
+:game_loop
+cls
+echo ==== ROUND %round% ====
+echo Your cards: %player_hand%
+echo Your current score: %player_score%
+echo.
+
+echo Dealer's cards: %dealer_hand:~0,2% [?]
+echo Dealer's visible score: %dealer_hand:~0,2%
+echo.
+
+:: Player's turn
+echo Your turn:
+choice /c:DHQ /n /m "Press D to Draw a card, H to Hold, or Q to Quit: "
+if errorlevel 3 goto second_menu
+if errorlevel 2 goto player_hold
+if errorlevel 1 goto player_draw
+
+:player_draw
+set /a card=%random% %% 10 + 1
+set /a player_score+=%card%
+set "player_hand=%player_hand% %card%"
+echo You drew a %card%. Your new score: %player_score%
+if %player_score% gtr 31 (
+    echo You busted! Your score is over 31.
+    pause
+    goto game_over
+)
+goto dealer_turn
+
+:player_hold
+echo You chose to hold. Your score remains %player_score%.
+goto dealer_turn
+
+:dealer_turn
+cls
+echo ==== ROUND %round% ====
+echo Your cards: %player_hand%
+echo Your current score: %player_score%
+echo.
+
+echo Dealer's cards: %dealer_hand%
+echo Dealer's current score: %dealer_score%
+echo.
+
+:: Dealer draws until score >= 17
+if %dealer_score% lss 17 (
+    set /a card=%random% %% 10 + 1
+    set /a dealer_score+=%card%
+    set "dealer_hand=%dealer_hand% %card%"
+    echo Dealer drew a %card%. Dealer's new score: %dealer_score%
+    if %dealer_score% gtr 31 (
+        echo Dealer busted! Dealer's score is over 31.
+        pause
+        goto game_over
+    )
+    goto dealer_turn
+) else (
+    echo Dealer chose to hold. Dealer's score remains %dealer_score%.
+    goto compare_scores
+)
+
+:compare_scores
+cls
+echo ==== FINAL SCORES ====
+echo Your cards: %player_hand%
+echo Your final score: %player_score%
+echo.
+
+echo Dealer's cards: %dealer_hand%
+echo Dealer's final score: %dealer_score%
+echo.
+
+if %player_score% gtr %dealer_score% (
+    echo You win! Your score is closer to 31.
+) else if %player_score% lss %dealer_score% (
+    echo Dealer wins! Dealer's score is closer to 31.
+) else (
+    echo It's a tie! Both scores are equal.
+)
+pause
+goto second_menu
+
+:game_over
+cls
+echo ==== GAME OVER ====
+echo Your cards: %player_hand%
+echo Your final score: %player_score%
+echo.
+
+echo Dealer's cards: %dealer_hand%
+echo Dealer's final score: %dealer_score%
+echo.
+
+if %player_score% gtr 31 (
+    echo You busted! Dealer wins.
+) else if %dealer_score% gtr 31 (
+    echo Dealer busted! You win.
+)
+pause
+goto second_menu
+
+:discord_bot
+cls
+echo ==== DISCORD BOT ====
+echo 1. Use an existing webhook
+echo 2. Create a new webhook
+echo 3. Return to menu
+choice /c:123Q /n /m "Choose an option (Q to quit): "
+
+if errorlevel 4 goto second_menu
+if errorlevel 3 goto second_menu
+if errorlevel 2 goto create_webhook
+if errorlevel 1 goto use_webhook
+
+:use_webhook
+cls
+echo ==== USE EXISTING WEBHOOK ====
+echo Available webhooks:
+dir /b Webhooks
+echo.
+
+set /p webhook_name="Enter the name of the webhook you want to use: "
+
+if not exist Webhooks\%webhook_name% (
+    echo Webhook not found!
+    pause
+    goto discord_bot
+)
+
+:: Read the webhook URL from the file
+set /p WEBHOOK_URL=<Webhooks\%webhook_name%\webhook.txt
+goto discord_loop
+
+:create_webhook
+cls
+echo ==== CREATE NEW WEBHOOK ====
+set /p webhook_name="Enter a name for the new webhook: "
+
+if exist Webhooks\%webhook_name% (
+    echo A webhook with that name already exists!
+    pause
+    goto discord_bot
+)
+
+mkdir Webhooks\%webhook_name%
+set /p WEBHOOK_URL="Enter the webhook URL: "
+echo %WEBHOOK_URL% > Webhooks\%webhook_name%\webhook.txt
+echo Webhook saved successfully!
+pause
+goto discord_bot
+
+:discord_loop
+cls
+echo ==== DISCORD BOT ====
+echo Using webhook: %WEBHOOK_URL%
+echo Type your message and press Enter to send it to Discord.
+echo Type 'exit' to return to the menu.
+
+set /p MESSAGE=Type your message: 
+
+:: Check if the user wants to exit
+if /i "%MESSAGE%"=="exit" goto second_menu
+
+:: Use curl to send the message to the webhook
+curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"%MESSAGE%\"}" %WEBHOOK_URL%
+
+:: Loop back to prompt for another message
+goto discord_loop
+
+:logout
+cls
+echo Logging out...
+pause
+goto main_menu
